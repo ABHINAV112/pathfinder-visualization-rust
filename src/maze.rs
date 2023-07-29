@@ -1,76 +1,89 @@
-use std::fmt::Debug;
+use std::collections::VecDeque;
 
-#[derive(Clone, Debug)]
-pub struct Dimensions(pub f32, pub f32);
-
-#[derive(Debug)]
-pub enum Cell {
-    Start,
-    End,
+#[derive(Default, Debug)]
+pub enum GridValue {
+    #[default]
     Empty,
     Wall,
-    WeightedWall(i32),
+    Start,
+    End,
 }
 
-pub struct Maze {
-    maze: Vec<Vec<Cell>>,
-    overall_dimensions: Dimensions,
-    unit_dimensions: Dimensions,
-}
-impl Debug for Maze {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Maze")
-            .field("overall_dimensions", &self.overall_dimensions)
-            .field("unit_dimensions", &self.unit_dimensions)
-            .finish()
-    }
+pub type Grid = Vec<Vec<GridValue>>;
+pub type Index = (usize, usize);
+
+#[derive(Default)]
+pub enum RenderAction {
+    #[default]
+    None,
+    FillCell(Index, GridValue),
+    FillCellVector(Vec<(Index, GridValue)>),
+    Clear,
+    ToggleCell(Index),
 }
 
-pub struct MazeBuilder {
-    pub maze_units: Option<(i32, i32)>,
-    pub overall_dimensions: Option<Dimensions>,
+// the goal is to have a renderer that is independent of the library being used
+pub trait GridRenderer {
+    fn handle_input(&self, grid: &Grid) -> Result<RenderAction, ()>;
+    fn render(&self, grid: &Grid) -> Result<(), ()>;
 }
 
-#[derive(Debug)]
-pub enum MazeBuildError {
-    BadMazeUnits,
-    BadOverallDimensions,
-    BadAttributes,
+pub struct GridManager {
+    grid: Grid,
+    render_queue: VecDeque<RenderAction>,
+    renderer: Box<dyn GridRenderer>,
 }
 
-impl MazeBuilder {
-    pub fn new() -> MazeBuilder {
-        MazeBuilder {
-            maze_units: None,
-            overall_dimensions: None,
+impl GridManager {
+    pub fn new(wh: (usize, usize), renderer: Box<dyn GridRenderer>) -> GridManager {
+        GridManager {
+            grid: (0..wh.1)
+                .map(|_| (0..wh.0).map(|_| GridValue::default()).collect())
+                .collect(),
+            render_queue: VecDeque::new(),
+            renderer,
         }
     }
 
-    pub fn set_maze_units(&mut self, maze_units: (i32, i32)) -> &Self {
-        self.maze_units = Some(maze_units);
-        self
+    pub fn add_render_action(&mut self, render_action: RenderAction) {
+        self.render_queue.push_back(render_action);
     }
 
-    pub fn set_overall_dimensions(&mut self, dimensions: Dimensions) -> &Self {
-        self.overall_dimensions = Some(dimensions);
-        self
+    pub fn handle_input(&mut self) -> Result<(), ()> {
+        let render_action = self.renderer.handle_input(&self.grid)?;
+        self.add_render_action(render_action);
+        Ok(())
     }
 
-    pub fn build(self) -> Result<Maze, MazeBuildError> {
-        match (self.maze_units, self.overall_dimensions) {
-            (None, None) => Err(MazeBuildError::BadAttributes),
-            (None, _) => Err(MazeBuildError::BadMazeUnits),
-            (_, None) => Err(MazeBuildError::BadOverallDimensions),
-            (Some(maze_units), Some(overall_dimensions)) => Ok(Maze {
-                maze: (0..maze_units.0)
-                    .map(|_| (0..maze_units.1).map(|_| Cell::Empty).collect())
-                    .collect(),
-                overall_dimensions: overall_dimensions.clone(),
-                unit_dimensions: Dimensions(
-                    overall_dimensions.0 / maze_units.0 as f32,
-                    overall_dimensions.1 / maze_units.1 as f32,
-                ),
-            }),
-        }
+    pub fn render(&mut self) -> Result<(), ()> {
+        let render_action = match self.render_queue.pop_front() {
+            None => return self.renderer.render(&self.grid),
+            Some(val) => val,
+        };
+        match render_action {
+            RenderAction::FillCell(index, grid_value) => self.grid[index.0][index.1] = grid_value,
+            RenderAction::FillCellVector(fill_actions) => {
+                fill_actions
+                    .into_iter()
+                    .map(|(index, grid_value)| self.grid[index.0][index.1] = grid_value)
+                    .count();
+            }
+            RenderAction::Clear => {
+                self.grid = self
+                    .grid
+                    .iter()
+                    .map(|row| row.iter().map(|_| GridValue::Empty).collect())
+                    .collect();
+            }
+            RenderAction::ToggleCell(index) => {
+                self.grid[index.0][index.1] = match self.grid[index.0][index.1] {
+                    GridValue::Empty => GridValue::Wall,
+                    _ => GridValue::Empty,
+                }
+            }
+            RenderAction::None => {}
+        };
+
+        self.renderer.render(&self.grid)
     }
 }

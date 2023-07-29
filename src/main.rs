@@ -1,24 +1,53 @@
-// use components::maze::Maze;
-use nannou::prelude::*;
+mod macroquad_renderer;
 mod maze;
 
-use maze::{Dimensions, Maze, MazeBuilder};
-fn main() {
-    nannou::sketch(view).run();
-}
+use macroquad::prelude::*;
+use macroquad::ui::{hash, root_ui, widgets};
+use macroquad_renderer::MacroQuadRenderer;
+use maze::GridManager;
 
-fn view(app: &App, frame: Frame) {
-    let draw = app.draw();
+#[macroquad::main("Events")]
+async fn main() -> Result<(), ()> {
+    let mut grid_manager = GridManager::new((50, 50), Box::new(MacroQuadRenderer::new()));
+    loop {
+        clear_background(WHITE);
 
-    draw.background().color(PLUM);
+        root_ui().window(hash!(), Vec2::new(20., 20.), Vec2::new(450., 200.), |ui| {
+            let (mouse_x, mouse_y) = mouse_position();
+            ui.label(None, &format!("Mouse position: {} {}", mouse_x, mouse_y));
 
-    let win = app.window_rect();
-    win.x_y();
+            let (mouse_wheel_x, mouse_wheel_y) = mouse_wheel();
+            ui.label(None, &format!("Mouse wheel x: {}", mouse_wheel_x));
+            ui.label(None, &format!("Mouse wheel y: {}", mouse_wheel_y));
 
-    let mut maze_builder = MazeBuilder::new();
-    maze_builder.set_maze_units((100, 100));
-    maze_builder.set_overall_dimensions(Dimensions(win.h(), win.w()));
-    let maze: Maze = maze_builder.build().expect("lmao");
-    println!("{:?}", maze);
-    draw.to_frame(app, &frame).unwrap()
+            widgets::Group::new(hash!(), Vec2::new(200., 90.))
+                .position(Vec2::new(240., 0.))
+                .ui(ui, |ui| {
+                    ui.label(None, "Pressed kbd keys");
+
+                    if let Some(key) = get_last_key_pressed() {
+                        ui.label(None, &format!("{:?}", key))
+                    }
+                });
+
+            widgets::Group::new(hash!(), Vec2::new(200., 90.))
+                .position(Vec2::new(240., 92.))
+                .ui(ui, |ui| {
+                    ui.label(None, "Pressed mouse keys");
+
+                    if is_mouse_button_down(MouseButton::Left) {
+                        ui.label(None, "Left");
+                    }
+                    if is_mouse_button_down(MouseButton::Right) {
+                        ui.label(None, "Right");
+                    }
+                    if is_mouse_button_down(MouseButton::Middle) {
+                        ui.label(None, "Middle");
+                    }
+                });
+        });
+        grid_manager.handle_input()?;
+        grid_manager.render()?;
+        next_frame().await;
+    }
 }
