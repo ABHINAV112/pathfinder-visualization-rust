@@ -15,6 +15,5 @@ pub fn random_horizontal(grid: &Grid) -> Vec<RenderAction> {
             }
         }
     }
-
-    return result;
+    result
 }

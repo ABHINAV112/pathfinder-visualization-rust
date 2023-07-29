@@ -8,6 +8,7 @@ pub enum GridValue {
     Start,
     End,
     Highlight,
+    Path,
 }
 
 pub type Grid = Vec<Vec<GridValue>>;
@@ -20,6 +21,7 @@ pub enum RenderAction {
     FillCell(Index, GridValue),
     FillCellVector(Vec<(Index, GridValue)>),
     Clear,
+    ClearHighlight,
 }
 
 // the goal is to have a renderer that is independent of the library being used
@@ -33,8 +35,8 @@ pub struct GridManager {
     grid_value: GridValue,
     render_queue: VecDeque<RenderAction>,
     renderer: Box<dyn GridRenderer>,
-    start: Option<Index>,
-    end: Option<Index>,
+    pub start: Option<Index>,
+    pub end: Option<Index>,
 }
 
 impl GridManager {
@@ -85,7 +87,6 @@ impl GridManager {
     }
 
     pub fn render(&mut self) -> Result<(), ()> {
-        println!("rendering {:?}", self.render_queue.len());
         let render_action = match self.render_queue.pop_front() {
             None => return self.renderer.render(&self.grid),
             Some(val) => val,
@@ -103,6 +104,20 @@ impl GridManager {
                     .grid
                     .iter()
                     .map(|row| row.iter().map(|_| GridValue::Empty).collect())
+                    .collect();
+            }
+            RenderAction::ClearHighlight => {
+                self.grid = self
+                    .grid
+                    .iter()
+                    .map(|row| {
+                        row.iter()
+                            .map(|grid_value| match grid_value {
+                                GridValue::Highlight | GridValue::Path => GridValue::Empty,
+                                _ => grid_value.clone(),
+                            })
+                            .collect()
+                    })
                     .collect();
             }
             RenderAction::None => {}

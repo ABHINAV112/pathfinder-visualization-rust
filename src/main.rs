@@ -1,17 +1,20 @@
 mod macroquad_renderer;
 mod maze;
 mod maze_algo;
+mod path_algo;
 
 use macroquad::prelude::*;
 use macroquad::ui::{hash, root_ui};
 use macroquad_renderer::MacroQuadRenderer;
 use maze::GridManager;
 use maze_algo::random_horizontal::random_horizontal;
+use maze_algo::random_recursion::random_recursion;
 use maze_algo::random_vertical::random_vertical;
+use path_algo::bfs::bfs;
 
 #[macroquad::main("Events")]
 async fn main() -> Result<(), ()> {
-    let mut grid_manager = GridManager::new((50, 50), Box::new(MacroQuadRenderer::new()));
+    let mut grid_manager = GridManager::new((80, 80), Box::new(MacroQuadRenderer::new()));
     loop {
         clear_background(WHITE);
 
@@ -55,6 +58,27 @@ async fn main() -> Result<(), ()> {
                 if ui.button(None, "Horizontal") {
                     grid_manager.add_render_action(maze::RenderAction::Clear);
                     random_horizontal(&grid_manager.grid)
+                        .into_iter()
+                        .for_each(|action| {
+                            grid_manager.add_render_action(action);
+                        });
+                }
+
+                ui.same_line(330.);
+                if ui.button(None, "Recursion") {
+                    grid_manager.add_render_action(maze::RenderAction::Clear);
+                    grid_manager.render().expect("render failed");
+                    random_recursion(&grid_manager.grid)
+                        .into_iter()
+                        .for_each(|action| {
+                            grid_manager.add_render_action(action);
+                        });
+                }
+                ui.same_line(400.);
+                if ui.button(None, "bfs") {
+                    grid_manager.add_render_action(maze::RenderAction::ClearHighlight);
+                    grid_manager.render().expect("render failed");
+                    bfs(&grid_manager.grid, &grid_manager.start, &grid_manager.end)
                         .into_iter()
                         .for_each(|action| {
                             grid_manager.add_render_action(action);

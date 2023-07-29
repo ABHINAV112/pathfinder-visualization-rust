@@ -20,6 +20,7 @@ impl MacroQuadRenderer {
             GridValue::Empty => WHITE,
             GridValue::Start => GREEN,
             GridValue::Highlight => YELLOW,
+            GridValue::Path => PURPLE,
         }
     }
 }
@@ -47,8 +48,8 @@ impl GridRenderer for MacroQuadRenderer {
                 draw_rectangle(
                     i as f32 * unit_dimensions.0,
                     j as f32 * unit_dimensions.1,
-                    unit_dimensions.0 * 0.95,
-                    unit_dimensions.1 * 0.95,
+                    unit_dimensions.0 * 0.9,
+                    unit_dimensions.1 * 0.9,
                     color,
                 );
             }
