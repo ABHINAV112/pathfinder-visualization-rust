@@ -1,10 +1,13 @@
 mod macroquad_renderer;
 mod maze;
+mod maze_algo;
 
 use macroquad::prelude::*;
-use macroquad::ui::{hash, root_ui, widgets};
+use macroquad::ui::{hash, root_ui};
 use macroquad_renderer::MacroQuadRenderer;
 use maze::GridManager;
+use maze_algo::random_horizontal::random_horizontal;
+use maze_algo::random_vertical::random_vertical;
 
 #[macroquad::main("Events")]
 async fn main() -> Result<(), ()> {
@@ -12,40 +15,53 @@ async fn main() -> Result<(), ()> {
     loop {
         clear_background(WHITE);
 
-        root_ui().window(hash!(), Vec2::new(20., 20.), Vec2::new(450., 200.), |ui| {
-            let (mouse_x, mouse_y) = mouse_position();
-            ui.label(None, &format!("Mouse position: {} {}", mouse_x, mouse_y));
+        root_ui().window(
+            hash!(),
+            Vec2::new(0., screen_height() - 50.),
+            Vec2::new(screen_width(), 50.),
+            |ui| {
+                ui.same_line(0.);
+                if ui.button(None, "Wall") {
+                    grid_manager.set_grid_value(maze::GridValue::Wall);
+                }
+                ui.same_line(40.);
+                if ui.button(None, "Empty") {
+                    grid_manager.set_grid_value(maze::GridValue::Empty);
+                }
+                ui.same_line(80.);
+                if ui.button(None, "Start") {
+                    grid_manager.set_grid_value(maze::GridValue::Start);
+                }
+                ui.same_line(120.);
+                if ui.button(None, "End") {
+                    grid_manager.set_grid_value(maze::GridValue::End);
+                }
 
-            let (mouse_wheel_x, mouse_wheel_y) = mouse_wheel();
-            ui.label(None, &format!("Mouse wheel x: {}", mouse_wheel_x));
-            ui.label(None, &format!("Mouse wheel y: {}", mouse_wheel_y));
+                ui.same_line(160.);
+                if ui.button(None, "Clear") {
+                    grid_manager.add_render_action(maze::RenderAction::Clear);
+                }
 
-            widgets::Group::new(hash!(), Vec2::new(200., 90.))
-                .position(Vec2::new(240., 0.))
-                .ui(ui, |ui| {
-                    ui.label(None, "Pressed kbd keys");
-
-                    if let Some(key) = get_last_key_pressed() {
-                        ui.label(None, &format!("{:?}", key))
-                    }
-                });
-
-            widgets::Group::new(hash!(), Vec2::new(200., 90.))
-                .position(Vec2::new(240., 92.))
-                .ui(ui, |ui| {
-                    ui.label(None, "Pressed mouse keys");
-
-                    if is_mouse_button_down(MouseButton::Left) {
-                        ui.label(None, "Left");
-                    }
-                    if is_mouse_button_down(MouseButton::Right) {
-                        ui.label(None, "Right");
-                    }
-                    if is_mouse_button_down(MouseButton::Middle) {
-                        ui.label(None, "Middle");
-                    }
-                });
-        });
+                ui.same_line(200.);
+                if ui.button(None, "Vertical") {
+                    grid_manager.add_render_action(maze::RenderAction::Clear);
+                    random_vertical(&grid_manager.grid)
+                        .into_iter()
+                        .for_each(|action| {
+                            grid_manager.add_render_action(action);
+                        });
+                }
+                ui.same_line(260.);
+                if ui.button(None, "Horizontal") {
+                    grid_manager.add_render_action(maze::RenderAction::Clear);
+                    random_horizontal(&grid_manager.grid)
+                        .into_iter()
+                        .for_each(|action| {
+                            grid_manager.add_render_action(action);
+                        });
+                }
+            },
+        );
         grid_manager.handle_input()?;
         grid_manager.render()?;
         next_frame().await;

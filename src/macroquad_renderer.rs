@@ -10,7 +10,7 @@ impl MacroQuadRenderer {
     fn get_unit_dimesions(&self, grid: &Grid) -> (f32, f32) {
         (
             screen_width() / grid.len() as f32,
-            screen_height() / grid[0].len() as f32,
+            (screen_height() - 50.) / grid[0].len() as f32,
         )
     }
     fn get_color(&self, grid_value: &GridValue) -> Color {
@@ -19,19 +19,22 @@ impl MacroQuadRenderer {
             GridValue::End => RED,
             GridValue::Empty => WHITE,
             GridValue::Start => GREEN,
+            GridValue::Highlight => YELLOW,
         }
     }
 }
 impl GridRenderer for MacroQuadRenderer {
-    fn handle_input(&self, grid: &Grid) -> Result<RenderAction, ()> {
+    fn handle_input(&self, grid: &Grid, grid_value: &GridValue) -> Result<RenderAction, ()> {
         let unit_dimensions: (f32, f32) = self.get_unit_dimesions(grid);
         if is_mouse_button_down(MouseButton::Left) {
-            println!("mouse positions {:?}", mouse_position());
             let mouse_pos_index: Index = (
                 (mouse_position().0 / unit_dimensions.0) as usize,
                 (mouse_position().1 / unit_dimensions.1) as usize,
             );
-            return Ok(RenderAction::FillCell(mouse_pos_index, GridValue::Wall));
+            if mouse_pos_index.0 >= grid.len() || mouse_pos_index.1 >= grid[0].len() {
+                return Ok(RenderAction::None);
+            }
+            return Ok(RenderAction::FillCell(mouse_pos_index, grid_value.clone()));
         }
         Ok(RenderAction::None)
     }

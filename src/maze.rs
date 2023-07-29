@@ -1,37 +1,40 @@
 use std::collections::VecDeque;
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub enum GridValue {
     #[default]
     Empty,
     Wall,
     Start,
     End,
+    Highlight,
 }
 
 pub type Grid = Vec<Vec<GridValue>>;
 pub type Index = (usize, usize);
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Eq, PartialEq)]
 pub enum RenderAction {
     #[default]
     None,
     FillCell(Index, GridValue),
     FillCellVector(Vec<(Index, GridValue)>),
     Clear,
-    ToggleCell(Index),
 }
 
 // the goal is to have a renderer that is independent of the library being used
 pub trait GridRenderer {
-    fn handle_input(&self, grid: &Grid) -> Result<RenderAction, ()>;
+    fn handle_input(&self, grid: &Grid, grid_value: &GridValue) -> Result<RenderAction, ()>;
     fn render(&self, grid: &Grid) -> Result<(), ()>;
 }
 
 pub struct GridManager {
-    grid: Grid,
+    pub grid: Grid,
+    grid_value: GridValue,
     render_queue: VecDeque<RenderAction>,
     renderer: Box<dyn GridRenderer>,
+    start: Option<Index>,
+    end: Option<Index>,
 }
 
 impl GridManager {
@@ -40,22 +43,49 @@ impl GridManager {
             grid: (0..wh.1)
                 .map(|_| (0..wh.0).map(|_| GridValue::default()).collect())
                 .collect(),
+            grid_value: GridValue::Wall,
             render_queue: VecDeque::new(),
             renderer,
+            start: None,
+            end: None,
         }
     }
 
     pub fn add_render_action(&mut self, render_action: RenderAction) {
+        if let RenderAction::FillCell(index, grid_value) = &render_action {
+            match grid_value {
+                GridValue::Start => {
+                    if let Some(start) = self.start {
+                        self.grid[start.0][start.1] = GridValue::Empty;
+                    }
+                    self.start = Some(index.clone());
+                }
+                GridValue::End => {
+                    if let Some(end) = self.end {
+                        self.grid[end.0][end.1] = GridValue::Empty;
+                    }
+                    self.end = Some(index.clone());
+                }
+                _ => {}
+            }
+        }
         self.render_queue.push_back(render_action);
     }
 
+    pub fn set_grid_value(&mut self, grid_value: GridValue) {
+        self.grid_value = grid_value;
+    }
+
     pub fn handle_input(&mut self) -> Result<(), ()> {
-        let render_action = self.renderer.handle_input(&self.grid)?;
-        self.add_render_action(render_action);
+        let render_action = self.renderer.handle_input(&self.grid, &self.grid_value)?;
+        if render_action != RenderAction::None {
+            self.add_render_action(render_action);
+        }
         Ok(())
     }
 
     pub fn render(&mut self) -> Result<(), ()> {
+        println!("rendering {:?}", self.render_queue.len());
         let render_action = match self.render_queue.pop_front() {
             None => return self.renderer.render(&self.grid),
             Some(val) => val,
@@ -74,12 +104,6 @@ impl GridManager {
                     .iter()
                     .map(|row| row.iter().map(|_| GridValue::Empty).collect())
                     .collect();
-            }
-            RenderAction::ToggleCell(index) => {
-                self.grid[index.0][index.1] = match self.grid[index.0][index.1] {
-                    GridValue::Empty => GridValue::Wall,
-                    _ => GridValue::Empty,
-                }
             }
             RenderAction::None => {}
         };
